@@ -61,7 +61,7 @@ Request: `{ "numeroCartao": "6549873025634501", "senha": "1234" }`
 Request: `{ "numeroCartao": "6549873025634501", "senhaCartao": "1234", "valor": 10.00 }`
 - `201` + `OK`
 - `422` + `SALDO_INSUFICIENTE` | `SENHA_INVALIDA` | `CARTAO_INEXISTENTE`
-- `400` campos ausentes, `valor` zero/negativo ou JSON malformado
+- `400` campos ausentes, `valor` zero/negativo ou com mais de 2 casas decimais, ou JSON malformado
 - `401` sem autenticação
 
 ## Testes

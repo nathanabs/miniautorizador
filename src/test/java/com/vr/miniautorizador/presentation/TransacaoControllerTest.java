@@ -117,6 +117,22 @@ class TransacaoControllerTest {
     }
 
     @Test
+    void postTransacoes_comValorComEscalaEnorme_retorna400SemAutorizar() throws Exception {
+        postAutenticado("{\"numeroCartao\":\"6549873025634501\",\"senhaCartao\":\"1234\",\"valor\":1e-1000000}")
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(autorizarTransacaoUseCase);
+    }
+
+    @Test
+    void postTransacoes_comFracaoDeCentavo_retorna400SemAutorizar() throws Exception {
+        postAutenticado("{\"numeroCartao\":\"6549873025634501\",\"senhaCartao\":\"1234\",\"valor\":10.001}")
+            .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(autorizarTransacaoUseCase);
+    }
+
+    @Test
     void postTransacoes_semValor_retorna400SemAutorizar() throws Exception {
         postAutenticado("{\"numeroCartao\":\"6549873025634501\",\"senhaCartao\":\"1234\"}")
             .andExpect(status().isBadRequest());
