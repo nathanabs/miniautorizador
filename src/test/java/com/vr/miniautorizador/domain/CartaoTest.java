@@ -8,15 +8,6 @@ import org.junit.jupiter.api.Test;
 class CartaoTest {
 
     @Test
-    void debitar_reduzSaldoPeloValorInformado() {
-        Cartao cartao = new Cartao("6549873025634501", "hash", new BigDecimal("500.00"));
-
-        cartao.debitar(new BigDecimal("10.00"));
-
-        assertThat(cartao.getSaldo()).isEqualByComparingTo("490.00");
-    }
-
-    @Test
     void construtor_exponeCamposViaGetters() {
         Cartao cartao = new Cartao("123", "hash", new BigDecimal("500.00"));
 

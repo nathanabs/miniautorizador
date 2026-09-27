@@ -81,11 +81,40 @@ Relatório HTML em `target/pit-reports/`.
 ## Decisões de projeto e boas práticas
 
 - **Clean Architecture** com inversão de dependência via porta `CartaoRepository`, mantendo o domínio livre de framework.
-- **Strategy pattern** para as regras de autorização: cada regra é um `@Component` que implementa `RegraAutorizacao`; o caso de uso recebe a `List<RegraAutorizacao>` ordenada por `@Order` e as executa com `forEach`. Adicionar uma nova regra não altera o caso de uso.
+- **Strategy pattern** para as regras de autorização: cada regra é um `@Component` que implementa `RegraAutorizacao`; o caso de uso recebe a `List<RegraAutorizacao>` ordenada por `@Order` e as executa com `forEach`, antes do débito. Adicionar uma nova regra não altera o caso de uso.
 - **Desafio "sem if"**: nenhum `if` no código de produção. Verificações de presença usam `Optional` (`findById(...).orElseThrow(...)`, `ifPresent`), condicionais viram `Optional.filter(...).orElseThrow(...)`, e o mapeamento de erros HTTP usa despacho polimórfico via `@ExceptionHandler` sobre a hierarquia `TransacaoNaoAutorizadaException`.
 - **Validação de entrada** com Bean Validation (`@NotBlank`, `@NotNull`, `@Positive`): impede, por exemplo, que um `valor` negativo credite o cartão.
 - **Senhas** armazenadas como hash BCrypt.
 - **Teste de mutação** com PITest para garantir que os testes de fato exercitam a lógica (não apenas cobrem linhas).
+
+## Concorrência
+
+Duas transações simultâneas no mesmo cartão (inclusive em instâncias diferentes da aplicação) não podem aprovar mais do que o saldo. O débito é um **único update condicional atômico** no MongoDB:
+
+```
+updateFirst({ _id: <cartão>, saldo: { $gte: <valor> } }, { $inc: { saldo: -<valor> } })
+```
+
+Operações em um único documento são atômicas no MongoDB: entre duas transações disputando o último saldo, só uma casa o filtro; a outra não altera nada e recebe `422 SALDO_INSUFICIENTE`. Não há trava na JVM, então a garantia vale para várias instâncias, e não depende de replica set nem de transações multi-documento (funciona no MongoDB 4.2 standalone do `compose.yaml`).
+
+O saldo é gravado como `Decimal128` (`spring.data.mongodb.representation.big-decimal=decimal128`) para que a comparação `$gte` seja numérica e a escala (`490.00`) seja preservada.
+
+### Verificação manual
+
+Com o MongoDB e a aplicação no ar (cartão novo começa com 500,00; duas transações de 400,00 ao mesmo tempo):
+
+```bash
+curl -u username:password -H 'Content-Type: application/json' \
+  -d '{"numeroCartao":"1111","senha":"1234"}' localhost:8080/cartoes
+for i in 1 2; do
+  curl -s -u username:password -H 'Content-Type: application/json' \
+    -d '{"numeroCartao":"1111","senhaCartao":"1234","valor":400.00}' \
+    localhost:8080/transacoes &
+done; wait
+curl -u username:password localhost:8080/cartoes/1111
+```
+
+Esperado: exatamente um `OK` e um `SALDO_INSUFICIENTE`; saldo final `100.00` (nunca `-300.00`).
 
 ## Suposições
 
@@ -95,4 +124,4 @@ Relatório HTML em `target/pit-reports/`.
 - Transações não são persistidas — apenas o saldo do cartão é atualizado.
 - Ordem das regras de autorização: existência do cartão → senha correta → saldo suficiente.
 - Requisições inválidas (campos ausentes, `valor` ≤ 0) retornam `400`, pois o contrato não define esse caso.
-- Controle de concorrência entre transações simultâneas não faz parte desta entrega (será tratado em fase posterior).
+- A garantia de concorrência não é coberta por teste automatizado contra MongoDB real (a suíte roda sem Docker); ela é verificada pelo roteiro manual acima.
