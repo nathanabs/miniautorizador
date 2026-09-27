@@ -2,6 +2,7 @@ package com.vr.miniautorizador.presentation;
 
 import com.vr.miniautorizador.domain.exception.CartaoJaExisteException;
 import com.vr.miniautorizador.domain.exception.CartaoNaoEncontradoException;
+import com.vr.miniautorizador.domain.exception.TransacaoNaoAutorizadaException;
 import com.vr.miniautorizador.presentation.dto.CriarCartaoResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CartaoNaoEncontradoException.class)
     public ResponseEntity<Void> handleCartaoNaoEncontrado(CartaoNaoEncontradoException ex) {
         return ResponseEntity.notFound().build();
+    }
+
+    @ExceptionHandler(TransacaoNaoAutorizadaException.class)
+    public ResponseEntity<String> handleTransacaoNaoAutorizada(TransacaoNaoAutorizadaException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(ex.getMotivo());
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
