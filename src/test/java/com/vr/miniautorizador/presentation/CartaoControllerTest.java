@@ -3,14 +3,17 @@ package com.vr.miniautorizador.presentation;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.vr.miniautorizador.application.usecase.CriarCartaoUseCase;
+import com.vr.miniautorizador.application.usecase.ObterSaldoUseCase;
 import com.vr.miniautorizador.domain.Cartao;
 import com.vr.miniautorizador.domain.exception.CartaoJaExisteException;
+import com.vr.miniautorizador.domain.exception.CartaoNaoEncontradoException;
 import com.vr.miniautorizador.infrastructure.config.BeanConfig;
 import com.vr.miniautorizador.infrastructure.config.SecurityConfig;
 import java.math.BigDecimal;
@@ -34,6 +37,9 @@ class CartaoControllerTest {
 
     @MockitoBean
     private CriarCartaoUseCase criarCartaoUseCase;
+
+    @MockitoBean
+    private ObterSaldoUseCase obterSaldoUseCase;
 
     @Test
     void postCartoes_comDadosValidos_retorna201ComSenhaEmTextoPlano() throws Exception {
@@ -115,5 +121,33 @@ class CartaoControllerTest {
             .andExpect(content().string(""));
 
         verifyNoInteractions(criarCartaoUseCase);
+    }
+
+    @Test
+    void getSaldo_comCartaoExistente_retorna200ComSaldo() throws Exception {
+        when(obterSaldoUseCase.obterSaldo("6549873025634501")).thenReturn(new BigDecimal("495.15"));
+
+        mockMvc.perform(get("/cartoes/6549873025634501")
+                .with(httpBasic("username", "password")))
+            .andExpect(status().isOk())
+            .andExpect(content().string("495.15"));
+    }
+
+    @Test
+    void getSaldo_comCartaoInexistente_retorna404SemCorpo() throws Exception {
+        when(obterSaldoUseCase.obterSaldo("999")).thenThrow(new CartaoNaoEncontradoException());
+
+        mockMvc.perform(get("/cartoes/999")
+                .with(httpBasic("username", "password")))
+            .andExpect(status().isNotFound())
+            .andExpect(content().string(""));
+    }
+
+    @Test
+    void getSaldo_semAutenticacao_retorna401() throws Exception {
+        mockMvc.perform(get("/cartoes/6549873025634501"))
+            .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(obterSaldoUseCase);
     }
 }
